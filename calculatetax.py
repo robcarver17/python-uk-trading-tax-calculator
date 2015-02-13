@@ -12,7 +12,7 @@
 
 
 import sys
-from positions import compare_trades_and_positions, tax_calc_dict_umatched_as_positions
+from positions import compare_trades_and_positions
 from fxrates import FXDict
 from taxcalcdict import TaxCalcDict
 from utils import star_line
