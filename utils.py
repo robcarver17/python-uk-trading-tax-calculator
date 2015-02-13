@@ -1,4 +1,17 @@
 """
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
+"""
 Useful utilities
 """
 
@@ -7,7 +20,7 @@ import pandas as pd
 import numpy as np
 import datetime
 
-def star_line(line_length=110):
+def star_line(line_length=140):
     return "".join(["*"]*line_length)+"\n"
 
 def type_and_sense_check_arguments(classobject, kwargs, checkrequired=True):
@@ -85,6 +98,7 @@ def check_identical_attribute(lst, element_name):
 
 def signs_match(x,y):
     ## Are the signs of x and y identical?
+    
     newsign=np.sign(x)        
     oldsign=np.sign(y)
     
@@ -133,3 +147,68 @@ def which_tax_year(date_time):
 
     return year
 
+def next_letter_code(letter):
+    ## We take the last letter
+    last_letter=letter[-1]
+    if last_letter=="z":
+        ## Add an extra letter
+        return letter+"a"
+    
+    next_letter=chr(ord(last_letter)+1)
+    
+    return letter[:-1]+next_letter
+
+def pretty(x, commas=True):
+    """
+    Return a string of x formatted nicely
+    """
+    
+    assert type(x) is float 
+    
+    if x==0.0:
+        return "0"
+    absx=abs(x)
+    
+    if int(x)==x:
+        if commas:
+            return "{:,.0f}".format(x)
+        else:
+            return "%d" % int(x)
+    
+    if absx>100000:
+        if commas:
+            return "{:,.0f}".format(x)
+        else:
+            return "%.0f" % x
+    
+    if absx>=1000:
+        if commas:
+            return "{:,.2f}".format(x)
+        else:
+            return "%.2f" % x
+
+    if absx>=100:
+        return "%.3f" % x
+
+
+    if absx>=10:
+        return "%.4f" % x
+
+    
+    if absx>=1:
+        return "%.5f" % x
+    
+    if absx>=0.1:
+        return "%.6f" % x
+    
+    if absx>=0.01:
+        return "%.7f" % x
+    
+    if absx>=0.001:
+        return "%.8f" % x
+    
+    if absx>=0.0001:
+        return "%.9f" % x
+
+    return "%.10f" % x
+    

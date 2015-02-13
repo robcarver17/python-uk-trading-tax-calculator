@@ -1,4 +1,17 @@
 """
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
+"""
 Import a generic csv
 
 

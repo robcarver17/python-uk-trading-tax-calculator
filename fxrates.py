@@ -1,11 +1,39 @@
+"""
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
 import pandas as pd
 from databasefxrates import get_fx_data
+from quandlfxrates import get_quandl_currency
 
 def FXDict(all_currencies, source):
+    """
+    Return pd dataframe of currencies
+    
+    all_currencies is list of currencies to get
+    
+    fx source can be: 'FIXED' uses fixed rates for whole year, 'QUANDL' downloads rates from www.quandl.com
+      'DATABASE' this is my function for accessing my own database. It won't work for you, need to roll your own
+    """
+
+    
     if source=="DATABASE":    
+        print "WARNING WILL BLOW UP IF YOU HAVEN'T SET UP A DATABASE"
         fx_dict=dict([(currency, get_fx_data(currency)) for currency in all_currencies])
     elif source=="FIXED":
         fx_dict=dict([(currency, get_fixed_fx_data(currency)) for currency in all_currencies])
+    elif source=="QUANDL":
+        fx_dict=dict([(currency, get_quandl_currency(currency)) for currency in all_currencies])
+        
     else:
         raise Exception("Source %s for fx data unknown. Use DATABASE or FIXED" % source)
         

@@ -1,10 +1,23 @@
+"""
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
 
+"""
+
+
+import sys
 from positions import compare_trades_and_positions, tax_calc_dict_umatched_as_positions
 from fxrates import FXDict
 from taxcalcdict import TaxCalcDict
 from utils import star_line
 
-def calculatetax(all_trades, all_positions=None, CGTCalc=True, reportfile="TaxReport", reportinglevel="NORMAL", fxsource="DATABASE"):
+def calculatetax(all_trades, all_positions=None, CGTCalc=True, reportfile=None, reportinglevel="NORMAL", fxsource="DATABASE"):
     """
     Calculate the tax
     
@@ -15,28 +28,35 @@ def calculatetax(all_trades, all_positions=None, CGTCalc=True, reportfile="TaxRe
               False means we use only S104; effectively calculating average cost for each trade
     
     reportinglevel - ANNUAL - summary for each year, BRIEF- plus one line per trade, 
-                   NORMAL - matching details per trade, VERBOSE - full breakdown of subtrade matching
+                   NORMAL - plus matching details per trade, CALCULATE - as normal plus calculations  
+                   VERBOSE - full breakdown of subtrade matching
     
-    reportfile- text file we dump answersinto
+    reportfile- text file we dump answers into. If omitted will print to screen.
 
-    fxsource will indicate source of data; change FXData function as appropriate 
+    fxsource will indicate source of data used by FXData function as appropriate
     
     """
     
-    assert reportinglevel in ["VERBOSE", "NORMAL", "BRIEF", "ANNUAL"]
-    report = open(reportfile, "w")
+    assert reportinglevel in ["VERBOSE", "CALCULATE", "NORMAL", "BRIEF", "ANNUAL"]
+    
+    if reportfile is None:
+        reportfile="the screen."
+        report=sys.stdout
+    else:
+        report = open(reportfile, "w")
     
     print "Report will be written to %s" % reportfile
     
+    ### Check against positions
     if all_positions is not None:    
         breaklist=compare_trades_and_positions(all_trades, all_positions)
         if len(breaklist)>0:
-            print "Breaks. Should be none apart from FX rates"
+            print "Breaks. Should be none except perhaps for FX rates."
             print breaklist
         else:
             print "Trades and positions consistent"
 
-
+    ### Add TradeID's
     all_trades.add_tradeids()
     
     ## Get FX data
@@ -52,15 +72,15 @@ def calculatetax(all_trades, all_positions=None, CGTCalc=True, reportfile="TaxRe
     trade_dict_bycode.add_cumulative_data()
     trade_dict_bycode.generate_pseduo_trades()
 
-    ## Create a tax dictionary        
+    ## Create a tax dictionary containing the trade data        
     taxcalc_dict=TaxCalcDict(trade_dict_bycode)
     
     ## Do the trade matching
     print "Matching trades"
     taxcalc_dict.allocate_dict_trades(CGTCalc)
 
-    ## Consistency check    
-    breaklist=compare_trades_and_positions(all_trades, tax_calc_dict_umatched_as_positions(taxcalc_dict))
+    ## Consistency check - this should never fail   
+    breaklist=compare_trades_and_positions(all_trades, taxcalc_dict.umatched_as_positions())
     
     if len(breaklist)>0:
         print "BREAKS between final positions and those implied by trades. Something gone horribly wrong!"
@@ -68,15 +88,19 @@ def calculatetax(all_trades, all_positions=None, CGTCalc=True, reportfile="TaxRe
         raise Exception("Breaks occured!")
     else:
         print "Passed consistency check"
-    
+
+    ## What tax years are our trades for    
     taxyears=taxcalc_dict.tax_year_span()
     
     for taxyear in taxyears:
         report.write(star_line())
         report.write("\n TAX YEAR: %d \n\n" % taxyear)
+        
+        ## Display taxes
         taxcalc_dict.display_taxes(taxyear, CGTCalc, reportinglevel, report)
 
-    report.close()
+    if reportfile is not "the screen":
+        report.close()
     
     print "Report finished"
         

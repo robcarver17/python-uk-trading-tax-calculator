@@ -1,4 +1,17 @@
 """
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
+"""
 This code reads my own data base of FX prices 
 
 If you have a database of FX prices then replace the code here, keeping the same function name get_fx_data

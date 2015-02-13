@@ -1,4 +1,17 @@
 """
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
+"""
 Shred the  reports produced by IB
 
 This section is for global variables that define how the data is stored in the .html files

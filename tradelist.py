@@ -1,3 +1,16 @@
+"""
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
 import datetime
 from copy import copy
 import numpy as np
@@ -83,8 +96,8 @@ class TradeList(list):
     def final_positions_as_dict(self):
         return self.separatecode().final_positions_as_dict()
 
-    def average_price(self):
-        ## Return average price (as absolute number)
+    def average_value(self):
+        ## Return average value (absolute)
         quantity=self.final_position() 
         
         ## can be zero
@@ -346,17 +359,14 @@ class TradeList(list):
             assert (len(self)+1) == old_trade_count
 
         else:
-            ## Pop part of the trade
-            finaltradetopop=tradetopop.share_of_trade(share=maxtopop)
-            
-            residualtradesize=tradetopop.SignQuantity - maxtopop
-            residualtrade=tradetopop.share_of_trade(share=residualtradesize)
+            ## Pop part of the trade, by spawing a child order
+            (parent_trade, finaltradetopop)=tradetopop.spawn_child_trade(share=maxtopop)
             
             ## Remove the original trade
             self.pop(tradeidx)
             
             ## Add the residual trade
-            self.append(residualtrade)
+            self.append(parent_trade)
             
             assert len(self) == old_trade_count
 
@@ -382,42 +392,41 @@ class TradeList(list):
         original_trades_to_trim=TradeList([self[idx] for idx in tradeidxlist])
         
         total_in_list=original_trades_to_trim.final_position()
+        
+        assert signs_match(totaltopop, total_in_list)
+        
         pro_rata=totaltopop/total_in_list
         
         residual = 1.0 - pro_rata
         
-        
-        if abs(residual)>THRESHOLD:
-            popped_trades=TradeList([tradetopop.share_of_trade(pro_rata=pro_rata) for tradetopop in original_trades_to_trim])
-            residual_trades=TradeList([tradetopop.share_of_trade(pro_rata=residual) for tradetopop in original_trades_to_trim])
-
-            ## remove original trades
-            for trade in original_trades_to_trim:
-                ## find matching trade (can't use original indices since will change with size of list)
-                trade_idx=[idx for idx in range(len(self)) if self[idx]==trade]
-                assert len(trade_idx)==1
-                
-                self.pop(trade_idx[0])
+        if abs(residual)<THRESHOLD:
+            residual=0.0
+            pro_rata=1.0
             
-            ## replace with residual trades
-            [self.append(trade) for trade in residual_trades]
+        ## Returns list of tuples (parent, child)
+        tradetuplelist=TradeList([tradetopop.spawn_child_trade(pro_rata=pro_rata) for tradetopop in original_trades_to_trim])
 
-            ## Residual left behind...
+        ## remove original trades
+        for trade in original_trades_to_trim:
+            ## find matching trade (can't use original indices since will change with size of list)
+            trade_idx=[idx for idx in range(len(self)) if self[idx]==trade]
+            assert len(trade_idx)==1
+            
+            self.pop(trade_idx[0])
+
+                    
+        popped_trades=TradeList([tradetuple[1] for tradetuple in tradetuplelist])
+        assert abs(totaltopop - popped_trades.final_position())<THRESHOLD
+
+        ## Residual left behind...
+        if residual>0.0:
+            ## Put residual parent trades back in
+            [self.append(tradetuple[0]) for tradetuple in tradetuplelist]
+
             assert len(self) == old_trade_count
-
 
         else:
             ## No residual trades, just pop in their entirity
-            popped_trades=TradeList()
-            for trade in original_trades_to_trim:
-                ## find matching trade (can't use original indices since will change with size of list)
-                trade_idx=[idx for idx in range(len(self)) if self[idx]==trade]
-                
-                ## Should only be one match
-                assert len(trade_idx)==1
-                
-                popped_trades.append(self.pop(trade_idx[0]))
-
             ## We've permanently lost these trades
             assert (len(self) + len(popped_trades)) == old_trade_count 
 
@@ -427,7 +436,33 @@ class TradeList(list):
         
         return popped_trades
                                
+    def print_trades_and_parents(self,report):
         
+        ## Print trade, and parent
+        for trade in self:
+            if "parent" in trade.argsused:
+                parentstring=" (Allocated from: "+trade.parent.brief()+")"
+            else:
+                parentstring=""
+            report.write(trade.__repr__()+parentstring+"\n")
+    
+    def range_of_dates(self):
+        ## Return a tuple, with the range of dates
+        
+        if len(self)==0:
+            return (None, None)
+        
+        datesinlist=[trade.Date for trade in self]
+        datesinlist.sort()
+        
+        return (datesinlist[0], datesinlist[-1])
+
+    def total_including_parents(self):
+        ## If a parent exists, return that; otherwise return own
+        
+        totalsinlist=[trade.total_mine_or_parent() for trade in self]
+        
+        return sum(totalsinlist)
 
 def _sign_change(x,y):
     if x>0 and y<0:

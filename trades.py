@@ -1,7 +1,20 @@
+"""
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
+
 import datetime
 from copy import copy
 
-from utils import type_and_sense_check_arguments, signs_match, repr_class
+from utils import type_and_sense_check_arguments, signs_match, repr_class,next_letter_code, pretty
 
 THRESHOLD=0.0001    
 
@@ -14,23 +27,23 @@ class Trade(object):
         return ['Code', 'Commission', 'Price', 'Quantity', 'Tax', 'Date',  'Currency']
 
     def _optional_columns(self):
-        return self._optional_columns_misc()+self._optional_columns_values()+self._optional_columns_fx()+ \
+        return self._optional_columns_misc()+self._optional_columns_values()+self._optional_columns_preprocess()+ \
             self._optional_columns_allocation()
         
     def _optional_columns_misc(self):
-        return ['AssetClass', 'parent']
+        return ['AssetClass', 'parent', 'nextchild','original']
         
     def _optional_columns_values(self):
-        return ['Value', 'SignQuantity', 'BS']
+        return [ 'BS']
 
-    def _optional_columns_fx(self):
-        return ['FXRate']
+    def _optional_columns_preprocess(self):
+        return ['FXRate', 'TradeID', 'Value', 'SignQuantity']
         
     def _optional_columns_allocation(self):
-        return ['tradetype', 'pseudotrade','sharedtrade', 'TradeID']
+        return ['tradetype', 'pseudotrade','sharedtrade']
 
-    def _has_fx_data(self):
-        return all([x in self.argsused for x in self._optional_columns_fx()]) 
+    def _has_preprocess_data(self):
+        return all([x in self.argsused for x in self._optional_columns_preprocess()]) 
     
     def _has_allocation_data(self):
         return all([x in self.argsused for x in self._optional_columns_allocation()]) and \
@@ -40,14 +53,15 @@ class Trade(object):
         """
         Can this trade be split? 
         """
-        return self._has_fx_data() and self._has_allocation_data()
+        return self._has_preprocess_data() and self._has_allocation_data()
         
     
     def _type_check(self):
         arg_types=dict(Code=str, Commission=float, Price=float, Quantity=float, Tax=float, Date=datetime.datetime, 
                        BS=str, Currency=str,  Value=float, 
                        SignQuantity=float, FXRate=float, AssetClass=str,
-                       tradetype=str, pseudotrade=bool, sharedtrade=bool, TradeID=str, parent=Trade)
+                       tradetype=str, pseudotrade=bool, sharedtrade=bool, TradeID=str, parent=Trade, nextchild=str,
+                       original=Trade)
 
         return arg_types
 
@@ -70,7 +84,8 @@ class Trade(object):
             assert self.typestring in ["Open", "Close", "OverClose"]
 
         if "Value" in self.argsused:
-            assert not signs_match(self.Value, self.SignQuantity) 
+            if not self.Value==0.0 and self.SignQuantity==0.0:
+                assert not signs_match(self.Value, self.SignQuantity) 
         
     def __init__(self, **kwargs):
 
@@ -105,7 +120,14 @@ class Trade(object):
         self._check_inputs()
 
     def __repr__(self):
-        return "Code: %s Sign Date %s Quantity %.2f tradeType %s" % (self.Code, str(self.Date), self.SignQuantity, self.tradetype)
+        
+        return "ID %s Code %s Date %s Quantity %s Price %s Value per block %s" %  \
+    (getattr(self, "TradeID",""), self.Code, str(self.Date), pretty(self.SignQuantity), 
+     pretty(self.Price), pretty(abs(self.Value/self.SignQuantity)))
+
+    def brief(self):
+        return "ID %s Quantity %s" %   (getattr(self, "TradeID",""), pretty(self.SignQuantity))
+        
 
     def full(self):
         print repr_class(self)
@@ -163,13 +185,12 @@ class Trade(object):
         
     def _init_allocation(self, tradetype):
         
-        if not self._has_fx_data():
-            raise Exception("Can't do an allocation without fx data, Value and SignQuantity")
+        assert self._has_preprocess_data()
         
         self.modify(tradetype=tradetype, pseudotrade=False, sharedtrade=False)
 
         
-    def share_of_trade(self, share=None, pro_rata=None):
+    def _share_of_trade(self, share=None, pro_rata=None):
         """
         Returns a trade, a clones of self, with quantity share or a pro_rata proportion
         
@@ -189,14 +210,18 @@ class Trade(object):
 
         if share is None:
             assert type(pro_rata) is float 
-            assert pro_rata>0.0 and pro_rata<1.0
+            assert pro_rata>=0.0 and pro_rata<=1.0
 
             share=oldquantity*pro_rata
 
-        
-        newtrade.modify(Value=self.Value*pro_rata, Commission=self.Commission*pro_rata, Tax=self.Tax*pro_rata, 
-                        SignQuantity=share, Quantity=abs(share),   
-                        )
+        if pro_rata==0.0:
+            newtrade.modify(Value=0.0, Commission=0.0, Tax=0.0, 
+                            SignQuantity=0.0, Quantity=0.0,   
+                            )
+        else:
+            newtrade.modify(Value=self.Value*pro_rata, Commission=self.Commission*pro_rata, Tax=self.Tax*pro_rata, 
+                            SignQuantity=share, Quantity=abs(share),   
+                            )
         
         return newtrade
         
@@ -205,9 +230,9 @@ class Trade(object):
         Returns a new clone trade with tradetoclose, and a residual clone trade
         
         """
-        if not self._ready_for_split():
-            raise Exception("You need to have done added fx and allocation data to this trade")
-
+        assert self._ready_for_split()
+        assert not self.pseudotrade
+        
         oldquantity=copy(self.SignQuantity)
         
         residualtrade=oldquantity - tradetoclose
@@ -217,8 +242,8 @@ class Trade(object):
         assert abs(tradetoclose)<=abs(oldquantity)
         assert abs(tradetoclose)>0.0
         
-        neworder=self.share_of_trade(share=tradetoclose)
-        changedorder=self.share_of_trade(share=residualtrade)
+        neworder=self._share_of_trade(share=tradetoclose)
+        changedorder=self._share_of_trade(share=residualtrade)
         
         neworder.modify(tradetype="Close")
         changedorder.modify(tradetype="Open")
@@ -236,4 +261,92 @@ class Trade(object):
         
         return [changedorder, neworder]
 
+    def spawn_child_trade(self, share=None, pro_rata=None):
+        """
+        Return a child order, which is a shared trade with a letter suffix, and the parent trade in attribute
+           and a smaller parent order.
+           
+        If this is an only child, then the child becomes the parent
+         
+        """
+        assert self._ready_for_split()
+        assert not self.sharedtrade
+
+        thischildid=(getattr(self, "nextchild",None))
+
+        if thischildid is None:
+            firstchild=True
+            thischildid="a"
+        else:
+            firstchild=False
+        
+        if share is not None:
+            residual_share = self.SignQuantity - share
+            residual_pro_rata=None
+            
+        elif pro_rata is not None:
+            if pro_rata==1.0:
+                residual_pro_rata=0.0
+            else:
+                residual_pro_rata = 1.0 - pro_rata
+
+            residual_share=None
+            
+        else:
+            raise Exception("Tried to spawn child order without share or pro rata")
+
+        original_trade=(getattr(self, "original",None))
+        if original_trade is None:
+            ## We keep this so we know the original size of the allocation
+            original_trade=copy(self)
+            self.modify(original=original_trade)
+            
+
+        child_trade=self._share_of_trade(share=share, pro_rata=pro_rata)
+        parent_trade=self._share_of_trade(share=residual_share, pro_rata=residual_pro_rata)
+
+        
+        parent_trade.modify(nextchild=next_letter_code(thischildid))
+
+        if firstchild and self._last_child(share=share, pro_rata=pro_rata):
+            ## only child- will be same as parent
+            childid=parent_trade.TradeID
+            child_trade.modify(sharedtrade=False, TradeID=childid)
+        else:
+            childid=parent_trade.TradeID+thischildid
+            child_trade.modify(sharedtrade=True, TradeID=childid, parent=original_trade)
+        
+        return (parent_trade, child_trade)
+        
+    def _last_child(self,share=None, pro_rata=None):
+        
+        oldquantity=self.SignQuantity
     
+        if pro_rata is not None:
+            assert type(pro_rata) is float 
+            assert pro_rata>=0.0 and pro_rata<=1.0
+
+            if abs(pro_rata - 1.0)<THRESHOLD:
+                return True
+            else:
+                return False
+        
+        if share is not None:
+            assert type(share) is float
+            assert signs_match(share, oldquantity)
+            assert abs(share)<=abs(oldquantity)
+            
+            if abs(share - oldquantity)<THRESHOLD:
+                return True
+            else:
+                return False
+            
+        raise Exception("no share or pro rata")
+    
+    def total_mine_or_parent(self):
+        parent=(getattr(self, "parent",None))
+        
+        if parent is None:
+            return self.SignQuantity
+        else:
+            return parent.SignQuantity

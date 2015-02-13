@@ -1,3 +1,15 @@
+"""
+    Python UK trading tax calculator
+    
+    Copyright (C) 2015  Robert Carver
+    
+    You may copy, modify and redistribute this file as allowed in the license agreement 
+         but you must retain this header
+    
+    See README.txt
+
+"""
+
 import pandas as pd
 from utils import type_and_sense_check_arguments
 from trades import THRESHOLD
@@ -71,17 +83,6 @@ class PositionList(list):
         ans=dict([(x.Code, x.Position) for x in self])
         return ans
 
-def tax_calc_dict_umatched_as_positions(taxcalc_dict):
-    """
-    Return a PositionList object containing the unmatched trades
-    """
-    result=PositionList()
-    
-    for code in taxcalc_dict.keys():
-        position=taxcalc_dict[code].unmatched.final_position()
-        result.append(Position(Code=code, Position=position))
-
-    return result
 
 def list_breaks(dict1, dict2):
     """
