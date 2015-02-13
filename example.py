@@ -72,8 +72,6 @@ if __name__=="__main__":
     ### Get trades and positions
     (all_trades, all_positions)=get_all_trades_and_positions()
     
-    ### Decide if we're calculating on a CGT or a 'true cost' basis
-    CGTCalc=False
     
     """
     Create a big report
@@ -89,9 +87,13 @@ if __name__=="__main__":
       'DATABASE' this is my function for accessing my own database. It won't work for you, need to roll your own
     
     """
+
+    ### Decide if we're calculating on a CGT or a 'true cost' basis
+    CGTCalc=True
+
     
     taxcalc_dict=calculatetax(all_trades, all_positions, CGTCalc=CGTCalc, reportfile="TaxReport.txt",
-                              reportinglevel="VERBOSE", fxsource="FIXED")
+                              reportinglevel="BRIEF", fxsource="FIXED")
     
     ## Example of how we can delve into the finer details. This stuff is all printed to screen
     ## You can also run this interactively
