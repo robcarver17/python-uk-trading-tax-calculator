@@ -47,7 +47,15 @@ class TaxCalcDict(dict):
         return self
 
 
+    def return_profits(self, taxyear, CGTCalc):
+        
+        codes= self.keys()
+        codes.sort()
+        elements_profits=dict([(code,self[code].element_return_profits(taxyear, CGTCalc)) for code in codes])
 
+        return elements_profits
+        
+        
     def display_taxes(self,  taxyear, CGTCalc, reportinglevel, report=None):
         """
         Run through each element, displaying the tax information in full
@@ -62,9 +70,9 @@ class TaxCalcDict(dict):
         ## Prints, and returns a tuple for each disposal_proceeds, allowable_costs, year_gains, year_losses,
         ##        number_disposals, commissions, taxes, gross profit, net profit
         
-        codes= self.values()
+        codes= self.keys()
         codes.sort()
-        elements_taxdata=[taxelement.element_display_taxes(taxyear, CGTCalc, reportinglevel, report) for taxelement in codes]
+        elements_taxdata=[self[code].element_display_taxes(taxyear, CGTCalc, reportinglevel, report) for code in codes]
 
         if len(elements_taxdata)==0:
             report.write(star_line())        
@@ -269,6 +277,17 @@ class TaxCalcElement(object):
         
         return taxcalcgroup
     
+
+    def element_return_profits(self, taxyear, CGTCalc):
+        ## Returns a list of profits
+        groupidlist=self.matched.keys()
+        groupidlist.sort()
+
+        ## Last is always net p&l        
+        taxdata=[self.matched[groupid].group_display_taxes(taxyear, CGTCalc, reportinglevel="", groupid=groupid, report=None, display=False)[-1] \
+                 for groupid in groupidlist]
+        
+        return taxdata
 
     def element_display_taxes(self, taxyear, CGTCalc, reportinglevel, report=None):
         ## Prints, and returns a tuple for each disposal_proceeds, allowable_costs, year_gains, year_losses,

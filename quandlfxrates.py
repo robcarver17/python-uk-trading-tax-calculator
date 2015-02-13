@@ -14,6 +14,7 @@
 import pandas as pd
 import Quandl
 
+authtoken='qWXuZcdwzwQ2GJQ88sNb'
 """
 Get currency data from www.quandl.com
 
@@ -41,7 +42,7 @@ def get_quandl_currency(currency):
      
 
     quandldef='CURRFX/%sGBP' % currency
-    data = Quandl.get(quandldef)
+    data = Quandl.get(quandldef, authtoken=authtoken)
     data=data['Rate']
         
     return data

@@ -212,3 +212,26 @@ def pretty(x, commas=True):
 
     return "%.10f" % x
     
+    
+def profit_analyser(profits):
+    ## Do some rudimentary analysis of profits
+    
+    biglist=[]
+    for code in profits.keys():
+        biglist=biglist+profits[code] 
+    
+    codes=profits.keys()
+    profits_by_code=[sum(profits[code]) for code in codes]
+    profits_by_code=pd.DataFrame(dict(code=codes, profit=profits_by_code))
+    
+    profits=[x for x in biglist if x>0]
+    losses=[x for x in biglist if x<0]
+    
+    print "%d Trades Profits %d Losses %s" % (len(biglist), len(profits),len(losses)) 
+    print "Average profit %f Average loss %f"  % (np.mean(profits), np.mean(losses))
+    
+    profits_by_code=profits_by_code.sort("profit")
+    
+    print "Total profits"
+    print profits_by_code
+    

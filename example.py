@@ -17,6 +17,7 @@ from calculatetax import calculatetax
 
 from tradelist import TradeList
 from positions import PositionList
+from utils import profit_analyser
 
 def get_all_trades_and_positions():
     """
@@ -35,15 +36,17 @@ def get_all_trades_and_positions():
     
     Here I'm loading reports from two IB accounts
     """
-    trades1=get_ib_trades("MAINtrades2014to20150205.html")
-    trades2=get_ib_trades("LONGtrades2014to20150205.html")
+    directory=""
+    
+    trades1=get_ib_trades(directory+"MAINtrades2014to20150205.html")
+    trades2=get_ib_trades(directory+"LONGtrades2014to20150205.html")
     
     """
     You can also use .csv files to store trades. I'm doing that here to account for positions I 
     transferred to IB
     
     """
-    trades3=read_generic_csv("tradespre2014.csv")
+    trades3=read_generic_csv(directory+"tradespre2014.csv")
     
     ## Doesn't inherit the type
     all_trades=TradeList(trades1+trades2+trades3)
@@ -56,8 +59,8 @@ def get_all_trades_and_positions():
     To get the file log in to Account manager... Reports.... activity report....
     Save as .html
     """
-    positions1=get_ib_positions('positions1.html')
-    positions2=get_ib_positions('positions2.html')
+    positions1=get_ib_positions(directory+'positions1.html')
+    positions2=get_ib_positions(directory+'positions2.html')
     
     """
     You can join together as many of these as you like
@@ -94,6 +97,8 @@ if __name__=="__main__":
     
     taxcalc_dict=calculatetax(all_trades, all_positions, CGTCalc=CGTCalc, reportfile="TaxReport.txt",
                               reportinglevel="BRIEF", fxsource="FIXED")
+
+    
     
     ## Example of how we can delve into the finer details. This stuff is all printed to screen
     ## You can also run this interactively
@@ -102,7 +107,15 @@ if __name__=="__main__":
     taxcalc_dict.display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="ANNUAL")
     
     ## Display all the trades for one code ('element')
-    taxcalc_dict['PAYl'].element_display_taxes(taxyear=2014, CGTCalc=CGTCalc, reportinglevel="CALCULATE")
+    taxcalc_dict['FBTP DEC 14'].element_display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="CALCULATE")
     
-    ## Display a particular trade. The number '1' is shown the report
-    taxcalc_dict['PAYl'].matched[1].group_display_taxes(taxyear=2014, CGTCalc=CGTCalc, reportinglevel="VERBOSE")
+    ## Display a particular trade. The number '3' is as shown the report
+    taxcalc_dict['FBTP DEC 14'].matched[3].group_display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="VERBOSE")
+
+    ## Heres a cool trade
+    taxcalc_dict['FGBS DEC 14'].matched[3].group_display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="VERBOSE")
+
+
+    ## Bonus feature - analyse profits
+    profits=taxcalc_dict.return_profits(2015, CGTCalc)
+    profit_analyser(profits)

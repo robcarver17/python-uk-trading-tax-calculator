@@ -109,7 +109,7 @@ class TaxCalcTradeGroup(object):
             return True
     
 
-    def group_display_taxes(self, taxyear, CGTCalc, reportinglevel, groupid=0, report=None):
+    def group_display_taxes(self, taxyear, CGTCalc, reportinglevel, groupid=0, report=None, display=True):
 
         ## Prints, and returns a tuple for each disposal_proceeds, allowable_costs, year_gains, year_losses,
         ##        number_disposals, commissions, taxes, gross profit
@@ -159,9 +159,10 @@ class TaxCalcTradeGroup(object):
         net_profit = gross_profit - taxes - commissions 
         gbp_net_profit = round(net_profit*fxrate)
 
-        self._print_tax_details(report, reportinglevel, CGTCalc,  net_profit, open_value, close_value,
-                          groupid, gbp_net_profit, open_comm, close_comm, open_tax, close_tax, allowable_costs,
-                          disposal_proceeds, commissions, taxes)
+        if display:
+            self._print_tax_details(report, reportinglevel, CGTCalc,  net_profit, open_value, close_value,
+                              groupid, gbp_net_profit, open_comm, close_comm, open_tax, close_tax, allowable_costs,
+                              disposal_proceeds, commissions, taxes)
 
         ## Need everything in GBP for summary tables
         
@@ -223,160 +224,183 @@ class TaxCalcTradeGroup(object):
 
 
     
-        assert reportinglevel in ["VERBOSE", "CALCULATE", "NORMAL", "BRIEF", "ANNUAL"]
+        inreport=reporting_detail(reportinglevel)
         
-        if reportinglevel in ["VERBOSE", "CALCULATE","NORMAL", "BRIEF"]:
-            """ 
-            Don't report if annual
+        if inreport.extraline():
+            report.write(star_line())
+            report.write("\n")
+        
+        if CGTCalc:
+
             """
-            if reportinglevel in ["VERBOSE", "CALCULATE","NORMAL"]:
-                report.write(star_line())
-                report.write("\n")
+            Example of CGT output
+            1. SELL: 40867 XYZ (Stock) on 17/12/2013 at EUR0.911 gives LOSS of XYZ 8,275.00 equals GBP 5,000
             
-            if CGTCalc:
-    
-                """
-                Example of CGT output
-                1. SELL: 40867 XYZ (Stock) on 17/12/2013 at EUR0.911 gives LOSS of XYZ 8,275.00 equals GBP 5,000
-                
-                (or CLOSE SHORT:  . Matches with OPEN SHORT: )
-                
-                Matches with: 
-                BUY: SAME DAY TRADES.
-                TRADES WITHIN 30 days 
-                SECTION 104 HOLDING. 40867 shares of XYZ bought at average price of EUR1.11333
-                
-                """
+            (or CLOSE SHORT:  . Matches with OPEN SHORT: )
+            
+            Matches with: 
+            BUY: SAME DAY TRADES.
+            TRADES WITHIN 30 days 
+            SECTION 104 HOLDING. 40867 shares of XYZ bought at average price of EUR1.11333
+            
+            """
+            
+            if inreport.showbrieftrade():
                 
                 report.write("%d: %s %d %s %s on %s at %s %s each gives %s of %s %s equals GBP %s\n" % \
                       (groupid, labels[1], int(abs_quantity), code, assetclass, datelabel, currency, pretty(average_close_value), 
                        pandl, currency, pretty(round(net_profit)), pretty(gbp_net_profit)))
+
+            if inreport.showextra():
+                report.write(" Commission %s %s and taxes %s %s on %s\n"% (currency, pretty(close_comm), currency, pretty(close_tax),labels[1]))
+
+            if inreport.listtrades():
+                report.write("Trade details:"+self.closingtrade.__repr__()+"\n")
     
-                if reportinglevel in ["VERBOSE", "CALCULATE","NORMAL"]:
-                    report.write(" Commission %s %s and taxes %s %s on %s\n"% (currency, pretty(close_comm), currency, pretty(close_tax),labels[1]))
-        
-                    if reportinglevel=="VERBOSE":
-                        report.write("Trade details:"+self.closingtrade.__repr__()+"\n")
-        
-                    report.write("Total allowable cost %s %s   Total disposal proceeds %s %s\n" % \
-                         (currency, pretty(allowable_costs), currency, pretty(disposal_proceeds))) 
-                                
-                    report.write("\nMatches with:\n")
-                    if len(self.sameday)>0:
-                        sameday_quantity=int(round(abs(self.sameday.final_position())))
-                        sameday_avg_value=self.sameday.average_value()
-                        sameday_tax=sum([trade.Tax for trade in self.sameday])
-                        sameday_comm=sum([trade.Commission for trade in self.sameday])
-
-                        sameday_calc_string="%s(%d*%s) - %s - %s " % \
-                            (signs[0], sameday_quantity, pretty(sameday_avg_value, commas=False), pretty(sameday_comm), pretty(sameday_tax))
-
-                        calc_string=calc_string+sameday_calc_string
-                        
-                        report.write("SAME DAY TRADE(S) Matches with %s of %d %s at average of %s %s each \n Commissions %s %s Taxes %s %s \n" % \
-                          (labels[0], sameday_quantity, code, currency, pretty(sameday_avg_value), currency, pretty(sameday_comm), currency, pretty(sameday_tax)))
-    
-                        if reportinglevel == "VERBOSE":
-                            report.write("\nTrades:\n")
-                            self.sameday.print_trades_and_parents(report)
-                                
-                    
-                    if len(self.withinmonth)>0:
-                        withinmonth_quantity=int(abs(round((self.withinmonth.final_position()))))
-                        withinmonth_avg_value=self.withinmonth.average_value()
-                        withinmonth_tax=sum([trade.Tax for trade in self.withinmonth])
-                        withinmonth_comm=sum([trade.Commission for trade in self.withinmonth])
-                        
-                        tradecount=len(self.withinmonth)
-                        (startdate,enddate)=self.withinmonth.range_of_dates()
-
-                        withinmonth_calc_string="%s(%d*%s) - %s - %s " % \
-                            (signs[0], withinmonth_quantity, pretty(withinmonth_avg_value, commas=False), pretty(withinmonth_comm), pretty(withinmonth_tax))
-
-                        calc_string=calc_string+withinmonth_calc_string
-                        
-        
-                        report.write("SUBSEQUENT %d TRADE(S) Within 30 days between %s and %s: Matches with %s of %d %s at of %s %s each \n Commissions %s %s Taxes %s %s  \n" % \
-                          (tradecount, str(startdate.date()), str(enddate.date()), labels[0], withinmonth_quantity, code, currency, pretty(withinmonth_avg_value), currency, pretty(withinmonth_comm), currency, pretty(withinmonth_tax)))
-    
-                        if reportinglevel == "VERBOSE":
-                            report.write("\nTrades:\n")
-                            self.withinmonth.print_trades_and_parents(report)
-
-                    
-                    if len(self.s104)>0:
-                        s104_quantity=int(round(abs(self.s104.final_position())))
-                        s104_avg_value=self.s104.average_value()
-                        s104_tax=sum([trade.Tax for trade in self.s104])
-                        s104_comm=sum([trade.Commission for trade in self.s104])
-
-                        tradecount=len(self.s104)
-                        (startdate,enddate)=self.s104.range_of_dates()
-                        parent_quantity=self.s104.total_including_parents()
-
-                        s104_calc_string="%s(%d*%s) - %s - %s " % \
-                            (signs[0], s104_quantity, pretty(s104_avg_value, commas=False), pretty(s104_comm), pretty(s104_tax))
-
-                        calc_string=calc_string+s104_calc_string
-        
-                        report.write("PRO-RATA SECTION 104 Holding of %f %s allocated out from total of %s trades between %s and %s at average value of %s %s \n Commissions %s %s Taxes %s %s  \n" % \
-                          ( s104_quantity, code, int(parent_quantity), str(startdate.date()), str(enddate.date()), currency, pretty(s104_avg_value), currency, pretty(s104_comm), currency, pretty(s104_tax)))
-
-                        if reportinglevel == "VERBOSE":
-                            report.write("\nTrades:\n")
-                            self.s104.print_trades_and_parents(report)
-
-    
-                    if reportinglevel in ["VERBOSE","CALCULATE"]:
-                        
-                        ## Show full calculations
-                        report.write("\nCALCULATION: "+calc_string+" = %s \n" % pretty(round(net_profit)))
+            if inreport.showextra():
+                report.write("Total allowable cost %s %s   Total disposal proceeds %s %s\n" % \
+                     (currency, pretty(allowable_costs), currency, pretty(disposal_proceeds))) 
                 
-            else:
-                """
-                Example of non CGT output
+                report.write("\nMatches with:\n")            
+            
                 
-                SELL 40867 RSA (Stock) on 17/12/2013 at EUR0.911 gives net LOSS of EUR 8,275 equals GBP5,000.0
-                AVERAGE price EUR .  Total commission: EUR   Total tax:  EUR 
-                """
+            if len(self.sameday)>0:
+                sameday_quantity=int(round(abs(self.sameday.final_position())))
+                sameday_avg_value=self.sameday.average_value()
+                sameday_tax=sum([trade.Tax for trade in self.sameday])
+                sameday_comm=sum([trade.Commission for trade in self.sameday])
+
+                sameday_calc_string="%s(%d*%s) - %s - %s " % \
+                    (signs[0], sameday_quantity, pretty(sameday_avg_value, commas=False), pretty(sameday_comm), pretty(sameday_tax))
+
+                calc_string=calc_string+sameday_calc_string
+
+                if inreport.showextra():
+                        
+                    report.write("SAME DAY TRADE(S) Matches with %s of %d %s at average of %s %s each \n Commissions %s %s Taxes %s %s \n" % \
+                      (labels[0], sameday_quantity, code, currency, pretty(sameday_avg_value), currency, pretty(sameday_comm), currency, pretty(sameday_tax)))
+
+                if inreport.listtrades():
+                    report.write("\nTrades:\n")
+                    self.sameday.print_trades_and_parents(report)
+                            
                 
+            if len(self.withinmonth)>0:
+                withinmonth_quantity=int(abs(round((self.withinmonth.final_position()))))
+                withinmonth_avg_value=self.withinmonth.average_value()
+                withinmonth_tax=sum([trade.Tax for trade in self.withinmonth])
+                withinmonth_comm=sum([trade.Commission for trade in self.withinmonth])
+                
+                tradecount=len(self.withinmonth)
+                (startdate,enddate)=self.withinmonth.range_of_dates()
+
+                withinmonth_calc_string="%s(%d*%s) - %s - %s " % \
+                    (signs[0], withinmonth_quantity, pretty(withinmonth_avg_value, commas=False), pretty(withinmonth_comm), pretty(withinmonth_tax))
+
+                calc_string=calc_string+withinmonth_calc_string
+                
+                if inreport.showextra():
+    
+                    report.write("SUBSEQUENT %d TRADE(S) Within 30 days between %s and %s: Matches with %s of %d %s at of %s %s each \n Commissions %s %s Taxes %s %s  \n" % \
+                      (tradecount, str(startdate.date()), str(enddate.date()), labels[0], withinmonth_quantity, code, currency, pretty(withinmonth_avg_value), currency, pretty(withinmonth_comm), currency, pretty(withinmonth_tax)))
+
+                if inreport.listtrades():
+
+                    report.write("\nTrades:\n")
+                    self.withinmonth.print_trades_and_parents(report)
+
+            
+            if len(self.s104)>0:
+                s104_quantity=int(round(abs(self.s104.final_position())))
+                s104_avg_value=self.s104.average_value()
+                s104_tax=sum([trade.Tax for trade in self.s104])
+                s104_comm=sum([trade.Commission for trade in self.s104])
+
+                tradecount=len(self.s104)
+                (startdate,enddate)=self.s104.range_of_dates()
+                parent_quantity=self.s104.total_including_parents()
+
+                s104_calc_string="%s(%d*%s) - %s - %s " % \
+                    (signs[0], s104_quantity, pretty(s104_avg_value, commas=False), pretty(s104_comm), pretty(s104_tax))
+
+                calc_string=calc_string+s104_calc_string
+
+                if inreport.showextra():
+
+                    report.write("PRO-RATA SECTION 104 Holding of %f %s allocated out from total of %s trades between %s and %s at average value of %s %s \n Commissions %s %s Taxes %s %s  \n" % \
+                      ( s104_quantity, code, int(parent_quantity), str(startdate.date()), str(enddate.date()), currency, pretty(s104_avg_value), currency, pretty(s104_comm), currency, pretty(s104_tax)))
+
+
+                if inreport.listtrades():
+                    report.write("\nTrades:\n")
+                    self.s104.print_trades_and_parents(report)
+
+
+            if inreport.showcalcs():
+                
+                ## Show full calculations
+                report.write("\nCALCULATION: "+calc_string+" = %s \n" % pretty(round(net_profit)))
+            
+        else:
+            """
+            Example of non CGT output
+            
+            SELL 40867 RSA (Stock) on 17/12/2013 at EUR0.911 gives net LOSS of EUR 8,275 equals GBP5,000.0
+            AVERAGE price EUR .  Total commission: EUR   Total tax:  EUR 
+            """
+            if inreport.showbrieftrade():
+            
                 report.write("%d: %s of %d %s %s on %s at %s %s each Net %s of %s %s equals GBP %s\n" % \
                       (groupid, labels[1], int(abs_quantity), code, assetclass, datelabel, currency, pretty(average_close_value),
                        pandl, currency, pretty(round(net_profit)), pretty(gbp_net_profit)))                       
 
-                if reportinglevel=="VERBOSE":
-                    
-                    report.write("Trade details:"+self.closingtrade.__repr__()+"\n")
-                    
-                        
-                       
-                if reportinglevel in ["VERBOSE", "NORMAL", "CALCULATE"]:
-                    
-                    tradecount=len(self.s104)
-                    (startdate,enddate)=self.s104.range_of_dates()
-                    parent_quantity=self.s104.total_including_parents()
-
-                    closing_calc_string="%s(%d*%s) - %s - %s " % \
-                        (signs[0], int(abs_quantity), pretty(average_open_value, commas=False), pretty(open_comm), pretty(open_tax))
-
-                    calc_string=calc_string+closing_calc_string
-
-        
-                    report.write("\n%s at average value %s each between %s and %s.  Total round-trip commission %s %s, and taxes %s %s" % \
-                           (labels[0], pretty(average_open_value), str(startdate.date()), str(enddate.date()), currency, pretty(commissions), currency, pretty(taxes)))
+            if inreport.listtrades():
                 
-                    
-                    if reportinglevel == "VERBOSE":
-                        ## Trade by trade breakdown
-                        report.write("\nTrades:\n")
-                        self.s104.print_trades_and_parents(report)
-                        pass
+                report.write("Trade details:"+self.closingtrade.__repr__()+"\n")
+                
+            tradecount=len(self.s104)
+            (startdate,enddate)=self.s104.range_of_dates()
+            parent_quantity=self.s104.total_including_parents()
 
-                    if reportinglevel in ["VERBOSE",  "CALCULATE"]:
- 
-                        ## calculations
-                        report.write("\nCALCULATION: "+calc_string+" = %s \n" % pretty(round(net_profit)))
+            closing_calc_string="%s(%d*%s) - %s - %s " % \
+                (signs[0], int(abs_quantity), pretty(average_open_value, commas=False), pretty(open_comm), pretty(open_tax))
+
+            calc_string=calc_string+closing_calc_string
+
+            if inreport.showextra():
     
-            if reportinglevel in ["VERBOSE", "NORMAL", "CALCULATE"]:
-                report.write("\n")
+                report.write("\n%s at average value %s each between %s and %s.  Total round-trip commission %s %s, and taxes %s %s" % \
+                       (labels[0], pretty(average_open_value), str(startdate.date()), str(enddate.date()), currency, pretty(commissions), currency, pretty(taxes)))
+        
+            
+            if inreport.listtrades():
+                ## Trade by trade breakdown
+                report.write("\nTrades:\n")
+                self.s104.print_trades_and_parents(report)
+
+            if inreport.showcalcs():
+                ## calculations
+                report.write("\nCALCULATION: "+calc_string+" = %s \n" % pretty(round(net_profit)))
+
+        if inreport.extraline():
+            report.write("\n")
+
+class reporting_detail(object):
+    def __init__(self, reportinglevel):
+        assert reportinglevel in ["VERBOSE", "CALCULATE", "NORMAL", "BRIEF", "ANNUAL"]
+        setattr(self, "reportinglevel", reportinglevel)
+        
+    def extraline(self):
+        return self.reportinglevel in ["VERBOSE", "CALCULATE", "NORMAL"]
     
+    def showbrieftrade(self):
+        return self.reportinglevel in ["VERBOSE", "CALCULATE", "NORMAL", "BRIEF"]
+
+    def showextra(self):
+        return self.reportinglevel in ["VERBOSE", "CALCULATE", "NORMAL"]
+    
+    def listtrades(self):
+        return self.reportinglevel in ["VERBOSE"]
+    
+    def showcalcs(self):
+        return self.reportinglevel in ["VERBOSE", "CALCULATE"]
