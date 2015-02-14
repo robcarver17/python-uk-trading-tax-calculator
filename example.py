@@ -107,7 +107,7 @@ if __name__=="__main__":
     taxcalc_dict.display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="ANNUAL")
     
     ## Display all the trades for one code ('element')
-    taxcalc_dict['FBTP DEC 14'].element_display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="CALCULATE")
+    taxcalc_dict['FBTP DEC 14'].display_taxes_for_code(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="CALCULATE")
     
     ## Display a particular trade. The number '3' is as shown the report
     taxcalc_dict['FBTP DEC 14'].matched[3].group_display_taxes(taxyear=2015, CGTCalc=CGTCalc, reportinglevel="VERBOSE")

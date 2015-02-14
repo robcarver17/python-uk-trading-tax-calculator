@@ -327,8 +327,8 @@ class TaxCalcTradeGroup(object):
 
                 if inreport.showextra():
 
-                    report.write("PRO-RATA SECTION 104 Holding of %f %s allocated out from total of %s trades between %s and %s at average value of %s %s \n Commissions %s %s Taxes %s %s  \n" % \
-                      ( s104_quantity, code, int(parent_quantity), str(startdate.date()), str(enddate.date()), currency, pretty(s104_avg_value), currency, pretty(s104_comm), currency, pretty(s104_tax)))
+                    report.write("PRO-RATA SECTION 104: Quantity %f %s allocated from total holding of %s, made up of %d trades between %s and %s\n At average value of %s %s Commissions %s %s Taxes %s %s  \n" % \
+                      ( s104_quantity, code, pretty(parent_quantity), len(self.s104), str(startdate.date()), str(enddate.date()), currency, pretty(s104_avg_value), currency, pretty(s104_comm), currency, pretty(s104_tax)))
 
 
                 if inreport.listtrades():
