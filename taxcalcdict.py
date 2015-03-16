@@ -10,7 +10,7 @@
 
 """
 
-
+import numpy as np
 import sys
 from tradelist import TradeList, TradeDictByCode
 from utils import  which_tax_year, star_line,pretty
@@ -55,6 +55,14 @@ class TaxCalcDict(dict):
 
         return elements_profits
         
+    def average_commission(self, taxyear):
+        codes= self.keys()
+        codes.sort()
+        average_commissions=dict([(code,self[code].average_commission(taxyear)) for code in codes])
+
+        return average_commissions
+
+
         
     def display_taxes(self,  taxyear, CGTCalc, reportinglevel, report=None):
         """
@@ -307,7 +315,28 @@ class TaxCalcElement(object):
         
         return sum_taxdata
 
-    
+    def average_commission(self, taxyear):
+        ## Returns the average commission
+        groupidlist=self.matched.keys()
+        groupidlist.sort()
+
+        ## Last is always net p&l        
+        taxdata=[self.matched[groupid].group_display_taxes(taxyear, CGTCalc=True, reportinglevel="", groupid=groupid, report=None, display=False) \
+                 for groupid in groupidlist]
+        
+        commissions=[x[5] for x in taxdata]
+        quants=[x[8] for x in taxdata]
+        
+        total_comm=sum(commissions)
+        total_quant=sum(quants)
+        
+        if total_quant==0.0:
+            if total_comm==0:
+                return np.nan
+            else:
+                return 0.0
+        
+        return total_comm / (2.0*total_quant)
 
 def display_summary_tax(summary_taxdata, CGTCalc, taxyear, report):
             
@@ -322,7 +351,7 @@ def display_summary_tax(summary_taxdata, CGTCalc, taxyear, report):
 
         ## Unpack tuple
         (gbp_disposal_proceeds, gbp_allowable_costs, gbp_gains, gbp_losses, number_disposals,
-                gbp_commissions, gbp_taxes, gbp_gross_profit, gbp_net_profit) = summary_taxdata
+                gbp_commissions, gbp_taxes, gbp_gross_profit,  abs_quantity, gbp_net_profit) = summary_taxdata
 
         report.write(star_line())
         

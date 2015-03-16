@@ -16,7 +16,7 @@ from trades import Trade, THRESHOLD
 from tradelist import TradeList
 from utils import tax_year, star_line,pretty
 
-zero_tax_tuple=(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0)
+zero_tax_tuple=(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 class TaxCalcTradeGroup(object):
@@ -90,11 +90,8 @@ class TaxCalcTradeGroup(object):
 
     
 
-    def fxrate(self):
-        """
-        Return the relevant fx rate to use
-        """
-        return self.closingtrade.FXRate
+    
+    
     
     def _in_tax_year(self, taxyear=None):
 
@@ -125,63 +122,113 @@ class TaxCalcTradeGroup(object):
         ## Put all the matching opening trades into one list
         matchinglist=self.matches_as_tradelist()
         
-        fxrate=self.fxrate()
+        
+        ## Different treatment depending on type
+        ## Defaults to equities
+        assetclass=getattr(self.closingtrade, "AssetClass", "Equity")
+        closingfxrate=self.closingtrade.FXRate
         
         ## Values, done on cashflow basis. -ve means buy, +ve means sell
         close_value=self.closingtrade.Value
         open_value=sum([trade.Value for trade in matchinglist])
 
-        
+
+        ## Taxes and commissions, always positive        
         close_tax=self.closingtrade.Tax
         close_comm=self.closingtrade.Commission
+
         open_tax=sum([trade.Tax for trade in matchinglist])
         open_comm=sum([trade.Commission for trade in matchinglist])
-        
+
         ## Fees, all positive
         taxes=open_tax+close_tax
         commissions=open_comm+close_comm
 
-        ## Cost and proceeds, positive only
-        ## We reverse these for short sales
+
+        ## Everything in GBP, using FX rate on day of each trade
+        close_value_gbp=self.closingtrade.Value *self.closingtrade.FXRate
+        open_value_gbp=sum([trade.Value * trade.FXRate for trade in matchinglist])
         
-        if close_value>0:
-            ## Normal, close with a sell
-            allowable_costs=abs(open_value) + open_tax + open_comm 
-            disposal_proceeds=abs(close_value) - close_tax - close_comm 
-        else:
-            disposal_proceeds=abs(open_value) + open_tax + open_comm 
-            allowable_costs=abs(close_value) - close_tax - close_comm 
+        close_tax_gbp=self.closingtrade.Tax * self.closingtrade.FXRate
+        close_comm_gbp=self.closingtrade.Commission * self.closingtrade.FXRate
+        
+        open_tax_gbp=sum([trade.Tax * trade.FXRate for trade in matchinglist])
+        open_comm_gbp=sum([trade.Commission * trade.FXRate for trade in matchinglist])
+        
+        gbp_taxes=open_tax_gbp+close_tax_gbp
+        gbp_commissions=open_comm_gbp+close_comm_gbp
+
+
+        ## Cost and proceeds
+        
+        ### Calculation depends on type of asset
+        
+        if assetclass=="Equity" or assetclass=="Stocks":
+            if close_value>0:
+                ## Normal, open with a buy, close with a sell
+                allowable_costs=abs(open_value) + open_tax + open_comm 
+                disposal_proceeds=abs(close_value) - close_tax - close_comm 
+
+                gbp_allowable_costs = abs(open_value_gbp)+ open_tax_gbp + open_comm_gbp
+                gbp_disposal_proceeds = abs(close_value_gbp) - close_tax_gbp - close_comm_gbp
+
+            
+            else:
+                ## Selling short
+                disposal_proceeds=abs(open_value) + open_tax + open_comm 
+                allowable_costs=abs(close_value) - close_tax - close_comm 
+
+                gbp_disposal_proceeds= abs(open_value_gbp)+ open_tax_gbp + open_comm_gbp
+                gbp_allowable_costs = abs(close_value_gbp) - close_tax_gbp - close_comm_gbp
+
+            
+        elif assetclass=="Futures" or assetclass=="Forex":
+            ## Futures. Disposal proceeds is local profit converted at closing FX rate
+            ## Allowable costs includes only commissions, taxes
+            
+            ##Note values are in cashflowbasis. So to work out profits we add them 
+            
+            allowable_costs=open_tax + open_comm
+            disposal_proceeds=( open_value + close_value) - close_tax - close_comm 
+
+            gbp_allowable_costs = open_tax_gbp + open_comm_gbp
+            gbp_disposal_proceeds = (open_value + close_value)*closingfxrate - close_tax_gbp - close_comm_gbp
             
         
-        ## Values are done on cash flow basis, so we can add up
-        gross_profit = open_value+close_value
+        else:
+            raise Exception("Asset class %s not recognised, no idea what to do. Must be Equity, Futures or Forex." % assetclass)
         
-        net_profit = gross_profit - taxes - commissions 
-        gbp_net_profit = round(net_profit*fxrate)
+            
+        
+        ## Gross and net profits
+        net_profit = disposal_proceeds - allowable_costs 
+        gbp_net_profit = gbp_disposal_proceeds - gbp_allowable_costs
+
+        ## We add back the positive taxes and commissions to get gross figures
+        gross_profit = net_profit + taxes + commissions
+        gbp_gross_profit = gbp_net_profit + gbp_taxes + gbp_commissions
+
+        
+        gbp_gains  = max(gbp_net_profit, 0.0)
+        gbp_losses = min(gbp_net_profit, 0.0) 
+
+        
 
         if display:
             self._print_tax_details(report, reportinglevel, CGTCalc,  net_profit, open_value, close_value,
                               groupid, gbp_net_profit, open_comm, close_comm, open_tax, close_tax, allowable_costs,
                               disposal_proceeds, commissions, taxes)
 
-        ## Need everything in GBP for summary tables
-        
-        gbp_gross_profit = gross_profit*fxrate
-        
-        gbp_commissions = commissions*fxrate
-        gbp_taxes = taxes*fxrate
 
-        gbp_disposal_proceeds = disposal_proceeds*fxrate
-        gbp_allowable_costs = allowable_costs*fxrate
-        
-        gbp_gains  = max(gbp_net_profit, 0.0)
-        gbp_losses = min(gbp_net_profit, 0.0) 
         
         ## Only one disposal per group
         number_disposals=1
 
+        ## Average commission
+        abs_quantity=abs(self.closingtrade.SignQuantity)
+
         return (gbp_disposal_proceeds, gbp_allowable_costs, gbp_gains, gbp_losses, number_disposals,
-                gbp_commissions, gbp_taxes, gbp_gross_profit, gbp_net_profit)
+                gbp_commissions, gbp_taxes, gbp_gross_profit, abs_quantity, gbp_net_profit)
         
     def _print_tax_details(self, report, reportinglevel, CGTCalc,  net_profit, open_value, close_value,
                           groupid, gbp_net_profit, open_comm, close_comm, open_tax, close_tax, allowable_costs,
@@ -218,9 +265,6 @@ class TaxCalcTradeGroup(object):
         else:
             pandl="PROFIT" 
 
-        ## Calculation strings, build up to show how we calculated our profit or loss
-        calc_string="%s(%d*%s) - %s - %s " % \
-        (signs[1], int(abs_quantity), pretty(average_close_value, commas=False), pretty(close_comm), pretty(close_tax))
 
 
     
@@ -262,6 +306,10 @@ class TaxCalcTradeGroup(object):
                      (currency, pretty(allowable_costs), currency, pretty(disposal_proceeds))) 
                 
                 report.write("\nMatches with:\n")            
+
+            ## Calculation strings, build up to show how we calculated our profit or loss
+            calc_string="%s(%d*%s) - %s - %s " % \
+            (signs[1], int(abs_quantity), pretty(average_close_value, commas=False), pretty(close_comm), pretty(close_tax))
             
                 
             if len(self.sameday)>0:
@@ -361,6 +409,11 @@ class TaxCalcTradeGroup(object):
             tradecount=len(self.s104)
             (startdate,enddate)=self.s104.range_of_dates()
             parent_quantity=self.s104.total_including_parents()
+
+            ## Calculation strings, build up to show how we calculated our profit or loss
+            calc_string="%s(%d*%s) - %s - %s " % \
+            (signs[1], int(abs_quantity), pretty(average_close_value, commas=False), pretty(close_comm), pretty(close_tax))
+
 
             closing_calc_string="%s(%d*%s) - %s - %s " % \
                 (signs[0], int(abs_quantity), pretty(average_open_value, commas=False), pretty(open_comm), pretty(open_tax))

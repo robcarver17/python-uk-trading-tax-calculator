@@ -10,6 +10,7 @@
 
 """
 
+import numpy as np
 
 from shredIBfiles import get_ib_trades, get_ib_positions
 from shredgenericcsv import read_generic_csv
@@ -36,7 +37,7 @@ def get_all_trades_and_positions():
     
     Here I'm loading reports from two IB accounts
     """
-    directory=""
+    directory="/home/rsc/"
     
     trades1=get_ib_trades(directory+"MAINtrades2014to20150205.html")
     trades2=get_ib_trades(directory+"LONGtrades2014to20150205.html")
@@ -59,8 +60,8 @@ def get_all_trades_and_positions():
     To get the file log in to Account manager... Reports.... activity report....
     Save as .html
     """
-    positions1=get_ib_positions(directory+'positions1.html')
-    positions2=get_ib_positions(directory+'positions2.html')
+    positions1=get_ib_positions(directory+'u144083.html')
+    positions2=get_ib_positions(directory+'u1228709.html')
     
     """
     You can join together as many of these as you like
@@ -96,7 +97,7 @@ if __name__=="__main__":
 
     
     taxcalc_dict=calculatetax(all_trades, all_positions, CGTCalc=CGTCalc, reportfile="TaxReport.txt",
-                              reportinglevel="BRIEF", fxsource="FIXED")
+                              reportinglevel="VERBOSE", fxsource="DATABASE")
 
     
     
@@ -120,3 +121,11 @@ if __name__=="__main__":
     ## Bonus feature - analyse profits
     profits=taxcalc_dict.return_profits(2015, CGTCalc)
     profit_analyser(profits)
+
+    avgcomm=taxcalc_dict.average_commission(2015)
+    codes=avgcomm.keys()
+    codes.sort()
+    for code in codes:
+        print "%s %f" % (code, avgcomm[code])
+        
+    print np.nanmean(avgcomm.values())
