@@ -313,7 +313,7 @@ class TradeList(list):
         new_final_position=self.final_position()
         new_trade_count=len(self)
         
-        assert old_final_position == new_final_position
+        assert abs(old_final_position - new_final_position)<THRESHOLD
         assert new_trade_count == starting_count_overclosed+old_trade_count
         
         return removedtrades
@@ -372,7 +372,7 @@ class TradeList(list):
 
         self.date_sort()
 
-        assert self.final_position()+finaltradetopop.SignQuantity == old_final_position
+        assert abs(self.final_position()+finaltradetopop.SignQuantity - old_final_position)<THRESHOLD
         
         return finaltradetopop
 

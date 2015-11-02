@@ -147,13 +147,21 @@ def _check_ignore_row(row, colref="Acct ID"):
     
     return False
 
-def _clean_pd_dataframe(pd_df, colref="Acct ID"):
+def _select_and_clean_pd_dataframe(main_table, selection_idx, colref="Acct ID"):
     """
     Remove 'dirty' rows from a dataframe, i.e. not real data
     """
     
+    if len(selection_idx)==0:
+        return None
+    
+    pd_df=main_table.iloc[selection_idx,:]
+    
     dirty_rows=[rowidx for rowidx in range(len(pd_df.index)) if _check_ignore_row(pd_df.irow(rowidx), colref)]
     pd_df=pd_df.drop(pd_df.index[dirty_rows])
+
+    if len(pd_df.index)==0:
+        return None
 
     return pd_df
 
@@ -265,7 +273,7 @@ def _parse_pandas_df(main_table, colref="Acct ID"):
     
     ## Create a dict of dicts of dataframes, with the appropriate subindex, cleaned up
     df_results=dict([(assetname, dict([
-                                    (ccy, _clean_pd_dataframe(main_table.iloc[results[assetname][ccy],:], colref) ) 
+                                    (ccy, _select_and_clean_pd_dataframe(main_table, results[assetname][ccy], colref) ) 
                                     for ccy in currencies])) for assetname in assetshortnames])
     
     return df_results
@@ -286,7 +294,7 @@ def _collapse_recursive_dict(df_results):
         
         for ccy in currencies:
             df_subsub=df_subresults[ccy]
-            if len(df_subsub.index)==0:
+            if df_subsub is None:
                 ## Empty dict. It happens
                 continue
             

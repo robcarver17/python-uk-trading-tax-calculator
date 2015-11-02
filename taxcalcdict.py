@@ -155,8 +155,16 @@ class TaxCalcElement(object):
 
     def __repr__(self):
         
-        return "%d matched, %d unmatched" % (len(self.matched), len(self.unmatched)) 
+        return "%s %d matched, %d unmatched" % (self.code(), len(self.matched), len(self.unmatched)) 
 
+    def code(self):
+        if len(self.matched)>0:
+            return self.matched.values()[0].closingtrade.Code
+        elif len(self.unmatched)>0:
+            return self.unmatched[0].Code
+        else:
+            return ""
+        
 
     def closing_trade_dates(self):
         datelist=[taxcalcgroup.closingtrade.Date for taxcalcgroup in self.matched.values()]
@@ -164,6 +172,7 @@ class TaxCalcElement(object):
         return datelist
 
     def allocate_trades(self, CGTcalc):
+        
         """
         One by one, push the closing trades (from earliest to latest) into matched
         
@@ -198,18 +207,23 @@ class TaxCalcElement(object):
                 ## The last one of these must be a closer with a different sign, pretending to be 
                 ##  an opener
                 
-                ## Make it into a closer, and then run a match
-         
-                ## get the last trade
-                self.unmatched.date_sort()
+                while len(self.unmatched)>0:
                 
-                tradetomatch=self.unmatched.pop()
-                tradetomatch.modify(tradetype="Close")
-                
-                assert self.unmatched.check_same_sign()
-                
-                taxcalcgroup=self.matchingforgroup(tradetomatch, CGTcalc)
-                self.matched[tradecount]=taxcalcgroup
+                    ## Make it into a closer, and then run a match
+             
+                    ## get the last trade
+                    self.unmatched.date_sort()
+                    
+                    tradetomatch=self.unmatched.pop()
+                    tradetomatch.modify(tradetype="Close")
+                    
+                    
+                    taxcalcgroup=self.matchingforgroup(tradetomatch, CGTcalc)
+                    self.matched[tradecount]=taxcalcgroup
+
+                    tradecount=tradecount+1
+
+                assert len(self.unmatched)==0
                 
             else:
                 ## We've got positions remaining, which is fine
