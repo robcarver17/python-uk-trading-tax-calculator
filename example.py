@@ -37,17 +37,16 @@ def get_all_trades_and_positions():
     
     Here I'm loading reports from two IB accounts
     """
-    directory="/home/rsc/"
     
-    trades1=get_ib_trades(directory+"MAINtrades2014to20150205.html")
-    trades2=get_ib_trades(directory+"LONGtrades2014to20150205.html")
+    trades1=get_ib_trades("MAINtrades2014to20150205.html")
+    trades2=get_ib_trades("LONGtrades2014to20150205.html")
     
     """
     You can also use .csv files to store trades. I'm doing that here to account for positions I 
     transferred to IB
     
     """
-    trades3=read_generic_csv(directory+"tradespre2014.csv")
+    trades3=read_generic_csv("tradespre2014.csv")
     
     ## Doesn't inherit the type
     all_trades=TradeList(trades1+trades2+trades3)
@@ -60,8 +59,8 @@ def get_all_trades_and_positions():
     To get the file log in to Account manager... Reports.... activity report....
     Save as .html
     """
-    positions1=get_ib_positions(directory+'u144083.html')
-    positions2=get_ib_positions(directory+'u1228709.html')
+    positions1=get_ib_positions('u144083.html')
+    positions2=get_ib_positions('u1228709.html')
     
     """
     You can join together as many of these as you like
