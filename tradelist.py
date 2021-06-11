@@ -128,119 +128,119 @@ class TradeList(list):
         if not self.check_same_currency():
             raise Exception("You can't apply FX rate as different currencies in TradeList")
         
-        dataframe=self.as_dataframe().sort()
+        dataframe=self.as_dataframe().sort_index()
         fxmat=uniquets(fxmat)
         fxmat=fxmat.reindex(dataframe.index, method="ffill")
-        [self[idx].modify(FXRate=float(fxmat[idx])) for idx in range(len(self))]
-        
-        
+        [self[idx].modify(FXRate=float(fxmat.iloc[idx])) for idx in range(len(self))]
+
+
     def all_currencies(self):
         """
         Unique list of currencies used
         """
         return list(set(self.as_dataframe().Currency))
-    
+
     def date_sort(self):
         self.sort(key=lambda x: x.Date)
-    
+
     def _cumulative_trades(self):
 
         self.date_sort()
         self.add_signed_quantities()
-        
+
 
         if not self.check_same_code():
             raise Exception("You can't get cumulative trade data as not same code")
 
         ## return the cumulative trade
         return list(np.cumsum([x.SignQuantity for x in self]))
-        
-    
+
+
     def add_tradeids(self):
-        
+
         existing_ids_exist=["TradeID" in trade.argsused for trade in self]
-        
+
         if all(existing_ids_exist):
             existing_ids=[trade.TradeID for trade in self]
             if not any_duplicates(existing_ids):
-                print "All trades have ID's - not renumbering"
+                print("All trades have ID's - not renumbering")
                 return None
             else:
-                print "All trades have ID's but duplicates! *** renumbering"
-        
+                print("All trades have ID's but duplicates! *** renumbering")
+
         self.timestampsort()
         [self[idx].modify(TradeID=str(idx)) for idx in range(len(self))]
-        
-        
-        
-    
+
+
+
+
     def _add_cumulative_data(self):
         """
         Add the  'tradetype', 'pseudotrade' labels to each trade
-        
+
         """
-        
-        ## Cumulative trade is effectively position        
+
+        ## Cumulative trade is effectively position
         position=self._cumulative_trades()
-        
+
         ## Trade type is determined by change from previous trade to this one
-        tradetypes=["Open"]+[_return_trade_type(position[idx], position[idx-1]) 
+        tradetypes=["Open"]+[_return_trade_type(position[idx], position[idx-1])
                              for idx in range(len(position))[1:]]
 
-        ## Add data to trades        
+        ## Add data to trades
         [self[idx]._init_allocation(tradetype=tradetypes[idx]) for idx in range(len(self))]
 
-        
+
         return self
-    
+
     def list_of_overclosed_trades(self):
 
         trade_types=[trade.tradetype for trade in self]
         overclosed_trades=[idx for idx in range(len(trade_types)) if trade_types[idx]=="OverClose"]
 
         return overclosed_trades
-    
+
     def list_of_closed_trades(self):
 
         trade_types=[trade.tradetype for trade in self]
         closed_trades=[idx for idx in range(len(trade_types)) if trade_types[idx]=="Close"]
 
         return closed_trades
-        
+
     def idx_of_trades_before_datetime(self, tradetomatch):
         tradedatetime=tradetomatch.Date
         self.date_sort()
         idx_trades_before_datetime=[idx for idx in range(len(self)) if self[idx].Date<=tradedatetime]
-        
+
         return idx_trades_before_datetime
-        
-        
+
+
     def idx_of_last_trade_same_day(self, tradetomatch):
         ## Return indices of trades with same date, executed prior to this trade, with opposite sign
-        
+
         tradedatetime=tradetomatch.Date
-        
+
         self.date_sort()
-        
+
         tradedate=tradedatetime.date()
-        
+
         listdatetimes=[trade.Date for trade in self]
         listdates=[x.date() for x in listdatetimes]
         listsignquant=[trade.SignQuantity for trade in self]
-        
+
         ## done on same day, but not in future
         ## Future trades on same day will be picked up in 'within 30 days' rule
-        same_day_trades=[idx for idx in range(len(listdates)) 
+        same_day_trades=[idx for idx in range(len(listdates))
                          if listdates[idx]==tradedate and listdatetimes[idx]<tradedatetime
                          and not signs_match(listsignquant[idx], tradetomatch.SignQuantity)]
-        
+
         if len(same_day_trades)==0:
             return None
-        
+
         return same_day_trades[-1]
-        
+
     def idx_of_first_trade_next_30days(self, tradetomatch):
-        ## Return index of first trade done after this trade, with opposite sign, and within 30 days 
+        ## Return index of first trade done after this trade, with opposite sign, and within 30 days
 
         self.date_sort()
 
@@ -249,7 +249,7 @@ class TradeList(list):
         listdatetimes=[trade.Date for trade in self]
         listdates=[x.date() for x in listdatetimes]
 
-        tradedate30daysafter=trade.Date.date()+datetime.timedelta(30)
+        tradedate30daysafter=tradedatetime.date()+datetime.timedelta(30)
         listsignquant=[trade.SignQuantity for trade in self]
 
 

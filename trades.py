@@ -130,7 +130,7 @@ class Trade(object):
         
 
     def full(self):
-        print repr_class(self)
+        print(repr_class(self))
 
     def add_value(self, raiseerror=True):
         if "Value" in self.argsused and raiseerror:

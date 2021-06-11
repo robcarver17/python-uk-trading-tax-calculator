@@ -60,7 +60,7 @@ def _from_genericpdf_to_trades_object(all_results, useassetclass):
     """
     Converts a pandas data frame to a list of trades
     """
-    tlist=TradeList([from_csv_row_to_trade(all_results.irow(idx), useassetclass) for idx in range(len(all_results.index))])
+    tlist=TradeList([from_csv_row_to_trade(all_results.iloc[idx], useassetclass) for idx in range(len(all_results.index))])
     
     return tlist
 
