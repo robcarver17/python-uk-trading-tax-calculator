@@ -12,7 +12,7 @@
 
 
 """
-This code reads my own data base of FX prices (actually .csv files from pysystemtrade)
+This code reads my own data base of FX prices 
 
 If you have a database of FX prices then replace the code here, keeping the same function name get_fx_data
 """
@@ -28,7 +28,7 @@ def get_fx_data(currency):
     ans=_get_fx_prices(currency)
     getdollars=_get_fx_prices("GBP").reindex(ans.index, method="ffill")
     ans=ans/getdollars
-
+    
     return ans
 
 def _get_fx_prices(currency):

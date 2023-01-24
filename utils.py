@@ -166,19 +166,19 @@ def pretty(x, commas=True):
     if x==0.0:
         return "0"
     absx=abs(x)
-
+    
     if int(x)==x:
         if commas:
             return "{:,.0f}".format(x)
         else:
             return "%d" % int(x)
-
+    
     if absx>100000:
         if commas:
             return "{:,.0f}".format(x)
         else:
             return "%.0f" % x
-
+    
     if absx>=1000:
         if commas:
             return "{:,.2f}".format(x)
@@ -192,32 +192,32 @@ def pretty(x, commas=True):
     if absx>=10:
         return "%.4f" % x
 
-
+    
     if absx>=1:
         return "%.5f" % x
-
+    
     if absx>=0.1:
         return "%.6f" % x
-
+    
     if absx>=0.01:
         return "%.7f" % x
-
+    
     if absx>=0.001:
         return "%.8f" % x
-
+    
     if absx>=0.0001:
         return "%.9f" % x
 
     return "%.10f" % x
-
-
+    
+    
 def profit_analyser(profits):
     ## Do some rudimentary analysis of profits
-
+    
     biglist=[]
     for code in profits.keys():
-        biglist=biglist+profits[code]
-
+        biglist=biglist+profits[code] 
+    
     codes=list(set(list(profits.keys())))
     profits_by_code=[sum(profits[code]) for code in codes]
     profits_by_code=pd.DataFrame(dict(code=codes, profit=profits_by_code))
@@ -229,13 +229,13 @@ def profit_analyser(profits):
     profits=[x for x in biglist if x>0]
     losses=[x for x in biglist if x<0]
     stdev = float(np.nanstd(biglist))
-
+    
     print("%d Trades Profits %d Losses %s" % (len(biglist), len(profits),len(losses)))
     print( "Average %f Average profit %f Average loss %f"  % (np.mean(biglist), np.mean(profits), np.mean(losses)))
     print( "Standard deviation %f" % stdev)
 
     profits_by_code=profits_by_code.sort_values("profit")
-
+    
     print( "Total profits by code")
     print( profits_by_code)
 
